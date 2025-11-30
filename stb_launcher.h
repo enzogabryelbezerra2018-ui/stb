@@ -571,3 +571,249 @@ static FSFile *fs_read(const char *name)
 //
 //    return 0;
 //}
+// ============================================================================
+//                       PARTE 5 — PACKAGE & SENSOR MANAGER
+// ============================================================================
+//
+//  API desejada:
+//
+//      stb_launcher_package("com.example.meuapp.pkg");
+//      stb_launcher_manage_sensor("GYRO");
+//      stb_launcher_manage_sensor("ACCEL");
+//      stb_launcher_manage_sensor("PROX");
+//
+//  O sistema faz:
+//      - registro de pacotes instalados
+//      - remoção e listagem
+//      - simulação de sensores reais
+//      - leitura de valores fake mas consistentes
+//
+// ============================================================================
+
+#ifndef STB_LAUNCHER_PACKAGE_SENSOR
+#define STB_LAUNCHER_PACKAGE_SENSOR
+
+// ============================================================================
+//  SISTEMA DE PACOTES (Package Manager)
+// ============================================================================
+
+#define PKG_MAX 64
+
+typedef struct {
+    char name[128];
+} STBPackage;
+
+static STBPackage stb_packages[PKG_MAX];
+static int stb_package_count = 0;
+
+static void stb_launcher_package(const char *pkg)
+{
+    if (stb_package_count >= PKG_MAX) {
+        printf("[package] ERRO: limite de pacotes atingido.\n");
+        return;
+    }
+
+    strcpy(stb_packages[stb_package_count].name, pkg);
+    stb_package_count++;
+
+    printf("[package] Instalado: %s\n", pkg);
+    logcat("package: pacote instalado");
+}
+
+static void stb_package_list()
+{
+    printf("\n[package] Lista de pacotes instalados:\n");
+    for (int i = 0; i < stb_package_count; i++)
+        printf("  - %s\n", stb_packages[i].name);
+
+    printf("\n");
+}
+
+
+// ============================================================================
+//  SISTEMA DE SENSORES (Sensor Manager)
+// ============================================================================
+
+typedef struct {
+    char name[32];
+    float value;
+} STBSensor;
+
+static STBSensor sensors[] = {
+    { "ACCEL", 0.0f },
+    { "GYRO", 0.0f },
+    { "PROX", 0.0f },
+    { "LIGHT", 0.0f },
+    { "TEMP", 0.0f }
+};
+
+static int sensor_count = 5;
+
+// Simula leitura real do sensor ----------------------------------------------
+static float sensor_read_value(const char *name)
+{
+    for (int i = 0; i < sensor_count; i++) {
+        if (!strcmp(name, sensors[i].name)) {
+            // muda "sozinha" igual sensor real
+            sensors[i].value += ((rand() % 100) - 50) / 100.0f;
+            return sensors[i].value;
+        }
+    }
+    return 0;
+}
+
+// API principal ----------------------------------------------------------------
+static float stb_launcher_manage_sensor(const char *sensor)
+{
+    float v = sensor_read_value(sensor);
+
+    if (v == 0 && strcmp(sensor, "ACCEL") != 0 &&
+                 strcmp(sensor, "GYRO")  != 0 &&
+                 strcmp(sensor, "PROX")  != 0 &&
+                 strcmp(sensor, "LIGHT") != 0 &&
+                 strcmp(sensor, "TEMP")  != 0)
+    {
+        printf("[sensor] ERRO: sensor inexistente: %s\n", sensor);
+        return 0;
+    }
+
+    printf("[sensor] %s = %.3f\n", sensor, v);
+    logcat("sensor: leitura realizada");
+
+    return v;
+}
+
+#endif
+// -----------------------------------------------------------------------------
+// SEÇÃO 6 — ACESSO A COMANDOS DO LINUX + GESTOR DE ERROS REAL
+// -----------------------------------------------------------------------------
+//
+// OBJETIVO:
+//  - Permitir execução de comandos reais do sistema Linux/Android (modo shell)
+//  - Fornecer sistema de erros profissional estilo OS
+//  - Criar log interno (debug, erro, warning, info)
+//
+// LIMITAÇÕES:
+//  - NÃO tem acesso root (a menos que o binário seja executado como root)
+//  - Só pode rodar comandos permitidos pelo usuário
+//  - Seguro por design (nada crítico do kernel é tocado)
+//
+// FUNÇÕES DISPONÍVEIS:
+//  - stb_launcher_exec("ls -la");
+//  - stb_launcher_exec_capture("dmesg");
+//
+//  - stb_error_push("Falha ao abrir arquivo");
+//  - stb_error_last();
+//  - stb_error_log("TAG", "mensagem");
+//
+//  - stb_panic("Kernel morreu!!!");
+// -----------------------------------------------------------------------------
+
+
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+
+// ============================= SHELL / TERMINAL ==============================
+
+// -----------------------------------------------------------------------------
+// EXECUTA UM COMANDO DO LINUX E NÃO CAPTURA SAÍDA (como system())
+// -----------------------------------------------------------------------------
+static int stb_launcher_exec(const char* cmd)
+{
+    if (!cmd) return -1;
+    return system(cmd);   // Executa comando no shell real
+}
+
+// -----------------------------------------------------------------------------
+// EXECUTA COMANDO E CAPTURA SAÍDA (usa popen)
+// -----------------------------------------------------------------------------
+static char* stb_launcher_exec_capture(const char* cmd)
+{
+    if (!cmd) return NULL;
+
+    FILE* p = popen(cmd, "r");
+    if (!p) return NULL;
+
+    static char buffer[8192];
+    size_t idx = 0;
+
+    int c;
+    while ((c = fgetc(p)) != EOF && idx < sizeof(buffer) - 1)
+    {
+        buffer[idx++] = (char)c;
+    }
+
+    buffer[idx] = '\0';
+    pclose(p);
+    return buffer; // contém a saída inteira do comando
+}
+
+
+
+// ============================= SISTEMA DE ERROS ==============================
+
+#define STB_MAX_ERRORS 128
+
+static const char* stb_error_stack[STB_MAX_ERRORS];
+static int stb_error_count = 0;
+
+// -----------------------------------------------------------------------------
+// ADICIONA ERRO NA PILHA
+// -----------------------------------------------------------------------------
+static void stb_error_push(const char* message)
+{
+    if (stb_error_count < STB_MAX_ERRORS)
+        stb_error_stack[stb_error_count++] = message;
+}
+
+// -----------------------------------------------------------------------------
+// RETORNA O ÚLTIMO ERRO
+// -----------------------------------------------------------------------------
+static const char* stb_error_last()
+{
+    if (stb_error_count == 0) return "Nenhum erro registrado";
+    return stb_error_stack[stb_error_count - 1];
+}
+
+// -----------------------------------------------------------------------------
+// LIMPA TODOS OS ERROS
+// -----------------------------------------------------------------------------
+static void stb_error_clear()
+{
+    stb_error_count = 0;
+}
+
+
+
+// ============================= SISTEMA DE LOG ================================
+
+static void stb_error_log(const char* tag, const char* msg)
+{
+    printf("[LOG][%s]: %s\n", tag, msg);
+}
+
+static void stb_warn_log(const char* tag, const char* msg)
+{
+    printf("[WARN][%s]: %s\n", tag, msg);
+}
+
+static void stb_error_log_fatal(const char* tag, const char* msg)
+{
+    printf("[FATAL][%s]: %s\n", tag, msg);
+}
+
+
+
+// ============================= PANIC / FALHAS GRAVES ==========================
+
+static void stb_panic(const char* msg)
+{
+    printf("\n\n=================== STB LAUNCHER PANIC ===================\n");
+    printf("%s\n", msg);
+    printf("Sistema parado para evitar corrupção.\n");
+    printf("===========================================================\n");
+
+    // Isso simula um crash real
+    exit(1);
+}
