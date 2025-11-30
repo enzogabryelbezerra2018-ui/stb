@@ -1026,3 +1026,111 @@ static void stb_kernel_init()
 
     printf("Kernel inicializado.\n");
 }
+// -----------------------------------------------------------------------------
+// SEÇÃO 11 — SISTEMA DE LOGS DO STB LAUNCHER
+// -----------------------------------------------------------------------------
+//
+// FUNÇÕES DISPONÍVEIS:
+//
+//   stb_launcher_log("TAG", "mensagem");
+//       → log normal estilo Android logcat
+//
+//   stb_launcher_kernel_panic_print("mensagem");
+//       → imprime uma tela de pânico igual kernel Linux
+//
+//   stb_launcher_print_secured_by_knox_or_no();
+//       → imprime se o dispositivo é "Secured by Knox" (simulado)
+// -----------------------------------------------------------------------------
+
+
+#include <time.h>
+
+// Utilidade interna: timestamp
+static void stb_log_timestamp()
+{
+    time_t now = time(NULL);
+    struct tm* t = localtime(&now);
+    printf("[%02d:%02d:%02d] ",
+        t->tm_hour, t->tm_min, t->tm_sec);
+}
+
+
+// -----------------------------------------------------------------------------
+// LOG NORMAL (ESTILO LOGCAT)
+// -----------------------------------------------------------------------------
+// Exemplo:
+//   stb_launcher_log("BOOT", "Inicializando kernel");
+// -----------------------------------------------------------------------------
+static void stb_launcher_log(const char* tag, const char* msg)
+{
+    if (!tag || !msg) return;
+
+    stb_log_timestamp();
+    printf("%s: %s\n", tag, msg);
+}
+
+
+
+// -----------------------------------------------------------------------------
+// KERNEL PANIC PRINT
+// -----------------------------------------------------------------------------
+// Mostra tela de pânico igual Linux:
+//   - Mensagem crítica
+//   - Stack fake
+//   - Finaliza execução
+//
+// Totalmente seguro → NÃO trava sistema real.
+// -----------------------------------------------------------------------------
+static void stb_launcher_kernel_panic_print(const char* message)
+{
+    printf("\n\n");
+    printf(" =====================================================\n");
+    printf("                 !!! KERNEL PANIC !!!                 \n");
+    printf(" -----------------------------------------------------\n");
+
+    if (message)
+        printf("  REASON: %s\n", message);
+    else
+        printf("  REASON: (unknown)\n");
+
+    printf(" -----------------------------------------------------\n");
+    printf("  Stacktrace (simulated):\n");
+    printf("    <stb_launcher_kernel> +0x14\n");
+    printf("    <stb_fs_mount>        +0x32\n");
+    printf("    <stb_boot_init>       +0x08\n");
+    printf(" -----------------------------------------------------\n");
+    printf("  System halted to avoid corruption.\n");
+    printf(" =====================================================\n\n");
+
+    // Não encerrar o programa de verdade no modo seguro
+    // exit(1);  // se você quiser REALISMOOOO
+}
+
+
+
+// -----------------------------------------------------------------------------
+// "SECURED BY KNOX" DETECTOR (SIMULADO)
+// -----------------------------------------------------------------------------
+// Android prints:
+//   "Secured by Knox"
+// Here you choose TRUE or FALSE manually.
+// -----------------------------------------------------------------------------
+
+static int stb_knox_enabled = 0;  // 0 = não, 1 = sim
+
+static void stb_launcher_set_knox(int enabled)
+{
+    stb_knox_enabled = enabled ? 1 : 0;
+}
+
+static void stb_launcher_print_secured_by_knox_or_no()
+{
+    if (stb_knox_enabled)
+    {
+        printf("[DEVICE-SECURITY] Secured by Knox\n");
+    }
+    else
+    {
+        printf("[DEVICE-SECURITY] Knox: NOT PRESENT\n");
+    }
+}
