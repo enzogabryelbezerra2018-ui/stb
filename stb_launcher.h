@@ -817,3 +817,212 @@ static void stb_panic(const char* msg)
     // Isso simula um crash real
     exit(1);
 }
+// -----------------------------------------------------------------------------
+// SEÇÃO 7 — GERENCIAMENTO DE PROCESSOS (SIMULADO)
+// -----------------------------------------------------------------------------
+//
+// TUDO é simulado. Não mata processos reais do sistema.
+// Cria uma tabela interna com processos falsos que você pode manipular.
+// ---------------------------------------------------------------------------
+
+#define STB_MAX_PROCESSES 128
+
+typedef struct {
+    int pid;
+    char name[64];
+    int running;
+} stb_process_t;
+
+static stb_process_t stb_process_table[STB_MAX_PROCESSES];
+static int stb_next_pid = 1;
+
+
+// Spawn (criar processo fake)
+static int stb_process_spawn(const char* name)
+{
+    for (int i = 0; i < STB_MAX_PROCESSES; i++)
+    {
+        if (!stb_process_table[i].running)
+        {
+            stb_process_table[i].pid = stb_next_pid++;
+            stb_process_table[i].running = 1;
+            strncpy(stb_process_table[i].name, name, 63);
+            return stb_process_table[i].pid;
+        }
+    }
+    return -1;
+}
+
+
+// Kill (matar processo fake)
+static void stb_process_kill(int pid)
+{
+    for (int i = 0; i < STB_MAX_PROCESSES; i++)
+    {
+        if (stb_process_table[i].pid == pid)
+        {
+            stb_process_table[i].running = 0;
+            return;
+        }
+    }
+}
+
+
+// Listar processos
+static void stb_process_list()
+{
+    printf("=== PROCESS LIST (SIMULATED) ===\n");
+
+    for (int i = 0; i < STB_MAX_PROCESSES; i++)
+    {
+        if (stb_process_table[i].running)
+            printf("PID %d  |  %s\n", 
+                stb_process_table[i].pid, 
+                stb_process_table[i].name);
+    }
+}
+// -----------------------------------------------------------------------------
+// SEÇÃO 8 — DRIVERS VIRTUAIS (SIMULAÇÃO COMPLETA)
+// -----------------------------------------------------------------------------
+//
+// Você pode registrar drivers como se fossem hardware real.
+// ---------------------------------------------------------------------------
+
+typedef enum {
+    STB_SENSOR_ACCEL,
+    STB_SENSOR_GYRO,
+    STB_SENSOR_LIGHT,
+    STB_SENSOR_TOUCH
+} stb_sensor_type;
+
+
+typedef struct {
+    stb_sensor_type type;
+    int enabled;
+    float value;
+} stb_sensor_driver;
+
+static stb_sensor_driver stb_sensors[16];
+
+
+// Registrar driver
+static void stb_driver_register_sensor(stb_sensor_type type)
+{
+    for (int i = 0; i < 16; i++)
+    {
+        if (!stb_sensors[i].enabled)
+        {
+            stb_sensors[i].type = type;
+            stb_sensors[i].enabled = 1;
+            stb_sensors[i].value = 0.0f;
+            return;
+        }
+    }
+}
+
+
+// Setar valor fake
+static void stb_sensor_set_value(stb_sensor_type type, float value)
+{
+    for (int i = 0; i < 16; i++)
+    {
+        if (stb_sensors[i].enabled && stb_sensors[i].type == type)
+        {
+            stb_sensors[i].value = value;
+            return;
+        }
+    }
+}
+// -----------------------------------------------------------------------------
+// SEÇÃO 9 — PACKAGE MANAGER (SIMULATED)
+// -----------------------------------------------------------------------------
+//
+// Instala / remove pacotes fake estilo apt/yum/apk.
+// Todos só existem em memória.
+// ---------------------------------------------------------------------------
+
+typedef struct {
+    char name[64];
+    int installed;
+} stb_pkg_t;
+
+static stb_pkg_t stb_pkg_db[128];
+
+
+// Instalar
+static int stb_pkg_install(const char* name)
+{
+    for (int i = 0; i < 128; i++)
+    {
+        if (!stb_pkg_db[i].installed)
+        {
+            stb_pkg_db[i].installed = 1;
+            strncpy(stb_pkg_db[i].name, name, 63);
+            return 0;
+        }
+    }
+    return -1;
+}
+
+
+// Remover
+static int stb_pkg_remove(const char* name)
+{
+    for (int i = 0; i < 128; i++)
+    {
+        if (stb_pkg_db[i].installed &&
+            strcmp(stb_pkg_db[i].name, name) == 0)
+        {
+            stb_pkg_db[i].installed = 0;
+            return 0;
+        }
+    }
+    return -1;
+}
+// -----------------------------------------------------------------------------
+// SEÇÃO 10 — KERNEL & INIT (SIMULADO)
+// -----------------------------------------------------------------------------
+//
+// Aqui criamos:
+//   ✔ mini kernel
+//   ✔ init
+//   ✔ serviços
+//
+// Não toca no kernel real do sistema. TOTALMENTE seguro.
+// -----------------------------------------------------------------------------
+
+
+typedef struct {
+    char name[64];
+    int running;
+} stb_service_t;
+
+static stb_service_t stb_services[64];
+
+// Registrar serviço
+static void stb_kernel_register_service(const char* name)
+{
+    for (int i = 0; i < 64; i++)
+    {
+        if (!stb_services[i].running)
+        {
+            stb_services[i].running = 1;
+            strncpy(stb_services[i].name, name, 63);
+            return;
+        }
+    }
+}
+
+// Init system
+static void stb_kernel_init()
+{
+    printf("=== STB KERNEL INIT ===\n");
+
+    stb_kernel_register_service("graphics");
+    stb_kernel_register_service("input");
+    stb_kernel_register_service("sensor");
+    stb_kernel_register_service("package_manager");
+    stb_kernel_register_service("shell");
+
+    printf("Kernel inicializado.\n");
+}
