@@ -1036,3 +1036,17 @@ void stb_function_1000() { printf("Linha 2000 finalizada.\n"); }
 //  S T B
 // S T B
 //  S T B
+//    __
+//   /  \
+//   \__/
+//    /\
+//   /  \
+//  /____\
+//    ||
+//   __
+//  /  \
+//  \__/     ← cabeça redondinha
+//   /\
+//  /  \      ← saia
+// /____\
+//   ||
